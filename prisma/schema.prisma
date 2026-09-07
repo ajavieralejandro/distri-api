@@ -11,3 +11,26 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// Product decision (2026-09-07): Distrisoft exposes exactly two profiles,
+// ADMIN (distributor side) and COMMERCE (client side). See
+// docs/architecture/decisions/003-two-profile-roles.md.
+enum Role {
+  ADMIN
+  COMMERCE
+}
+
+/// Minimal user record for the two-profile model. Real auth (password
+/// hashing, sessions/JWT) is not implemented yet — see
+/// distri-front/contracts/decisions/authentication.md (OQ-01/OQ-02).
+/// commerceId is a plain scalar, not a relation: the Commerce entity itself
+/// is not modeled yet (see ROADMAP.md, etapa "D1 — Core comercial real").
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  displayName String
+  role        Role
+  commerceId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
