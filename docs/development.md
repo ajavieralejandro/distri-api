@@ -52,19 +52,21 @@ npm run prisma:generate
 
 ## Ejecutar migraciones
 
-Cuando existan migraciones de dominio:
+La primera migración crea usuarios, comercios, catálogo y pedidos:
 
 ```bash
 npm run prisma:migrate
 ```
 
-En entornos desplegados:
+En un entorno ya desplegado:
 
 ```bash
 npm run prisma:migrate:deploy
 ```
 
-> En la etapa actual el schema no define modelos comerciales. `prisma generate` es suficiente para verificar el cliente; las migraciones de negocio se agregarán con los módulos correspondientes.
+Los datos de prueba se cargan con `npm run prisma:seed`. Hace falta `SEED_PASSWORD` en el entorno. No corre si `NODE_ENV=production`. Si la base no está en localhost, además hace falta `SEED_CONFIRM=yes`.
+
+La API exige `JWT_SECRET` de al menos 32 caracteres. No lo commitees.
 
 ## Iniciar desarrollo
 

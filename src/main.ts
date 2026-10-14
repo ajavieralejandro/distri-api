@@ -46,11 +46,9 @@ async function bootstrap(): Promise<void> {
   if (nodeEnv !== 'production') {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Distrisoft API')
-      .setDescription(
-        'Backend API for the Distrisoft distributor system. ' +
-          'This stage exposes infrastructure endpoints only.',
-      )
-      .setVersion('0.1.0')
+      .setDescription('Backend API for the Distrisoft distributor system.')
+      .setVersion('0.2.0')
+      .addBearerAuth()
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig);
