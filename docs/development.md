@@ -2,9 +2,9 @@
 
 ## Requisitos
 
-- Node.js LTS (recomendado: 22.x)
+- Node.js 22 o superior. En esta máquina se verificó con Node 24.19.0. En Ubuntu instalá la 22 LTS o la 24 LTS; el `package.json` declara `"node": ">=22"`.
 - npm
-- Docker y Docker Compose (para PostgreSQL local)
+- Docker y Docker Compose, solo para el PostgreSQL local. El servidor de pruebas puede usar PostgreSQL instalado en el sistema.
 
 ## Instalar dependencias
 
@@ -64,7 +64,9 @@ En un entorno ya desplegado:
 npm run prisma:migrate:deploy
 ```
 
-Los datos de prueba se cargan con `npm run prisma:seed`. Hace falta `SEED_PASSWORD` en el entorno. No corre si `NODE_ENV=production`. Si la base no está en localhost, además hace falta `SEED_CONFIRM=yes`.
+Los datos de prueba no se cargan al arrancar ni al migrar. `npm run prisma:seed` crea las cuentas y los productos que falten y no modifica una cuenta ya existente ni su contraseña. Se niega si `NODE_ENV=production`. Si la base no está en localhost, además hace falta `SEED_CONFIRM=yes`. La contraseña entra por `SEED_PASSWORD` y no se imprime.
+
+Si el proceso de pruebas corre con `NODE_ENV=production`, no uses el seed. El comando separado es `npm run test-data:init`, y solo corre con `INIT_TEST_DATA=yes` y `INIT_TEST_DATABASE_NAME` igual al nombre de la base de `DATABASE_URL`. En production además hace falta `INIT_TEST_ALLOW_PRODUCTION=yes`. Tampoco pisa cuentas ni contraseñas existentes.
 
 La API exige `JWT_SECRET` de al menos 32 caracteres. No lo commitees.
 

@@ -310,6 +310,11 @@ describe('OrdersService', () => {
     expect(confirmed.status).toBe('CONFIRMED');
     expect(store.products[0]?.availableStock).toBe(8);
 
+    await expect(
+      service.updateStatus(admin, order.id, 'CONFIRMED'),
+    ).rejects.toMatchObject({ errorCode: 'INVALID_ORDER_TRANSITION' });
+    expect(store.products[0]?.availableStock).toBe(8);
+
     const preparing = await service.updateStatus(admin, order.id, 'PREPARING');
     expect(preparing.status).toBe('PREPARING');
     expect(store.products[0]?.availableStock).toBe(8);

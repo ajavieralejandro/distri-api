@@ -158,6 +158,9 @@ describe('AuthService', () => {
     expect(verifyAccessToken(result.tokens.accessToken, SECRET)?.sub).toBe(
       'user-norte',
     );
+    await expect(
+      service.login('norte@pruebas.distrisoft.local', 'clave-incorrecta'),
+    ).rejects.toMatchObject({ errorCode: 'UNAUTHORIZED' });
   });
 
   it('rejects an unknown user and a commerce account without a commerce', async () => {
