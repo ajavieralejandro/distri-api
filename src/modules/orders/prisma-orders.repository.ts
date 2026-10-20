@@ -173,6 +173,24 @@ class PrismaOrderTx implements OrderTx {
     return true;
   }
 
+  async tryChangeStatus(
+  id: string,
+  expectedStatus: StoredOrder['status'],
+  nextStatus: StoredOrder['status'],
+): Promise<boolean> {
+  const result = await this.tx.order.updateMany({
+    where: {
+      id,
+      status: expectedStatus,
+    },
+    data: {
+      status: nextStatus,
+    },
+  });
+
+  return result.count === 1;
+}
+
   async applyStatus(input: {
     orderId: string;
     to: StoredOrder['status'];
@@ -204,6 +222,7 @@ class PrismaOrderTx implements OrderTx {
     return toView(updated);
   }
 }
+
 
 function toView(order: OrderRow): StoredOrder {
   return {
@@ -246,4 +265,6 @@ function toView(order: OrderRow): StoredOrder {
       createdAt: event.createdAt.toISOString(),
     })),
   };
+
+  
 }

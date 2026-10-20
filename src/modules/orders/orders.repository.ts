@@ -107,6 +107,12 @@ export interface OrderTx {
     userId: string;
     stockDeducted: boolean;
   }): Promise<StoredOrder>;
+
+  tryChangeStatus(
+  id: string,
+  expectedStatus: StoredOrder['status'],
+  nextStatus: StoredOrder['status'],
+): Promise<boolean>;
 }
 
 export interface OrdersRepository {
