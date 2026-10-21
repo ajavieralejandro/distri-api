@@ -92,12 +92,4 @@ Si un controller crece en “ifs” de negocio, esa lógica debe bajarse al appl
 
 ## Estado actual
 
-En esta etapa solo está implementada la base técnica:
-
-- Bootstrap NestJS + configuración validada
-- Prisma + PostgreSQL
-- Health check
-- Errores, logging y Swagger (no producción)
-- Documentación de arquitectura y desarrollo
-
-Los módulos comerciales se diseñarán e implementarán después de validar esta base.
+Además de la base técnica (configuración, Prisma, health, errores y Swagger) el corte de pedidos expone autenticación JWT, catálogo, comercios, creación y consulta de pedidos, y el cambio de estado por un administrador. No hay cuenta corriente ni pagos. El detalle del contrato está en `docs/integracion-apk-api.md` de la carpeta Distrisoft.

@@ -1,0 +1,22 @@
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: distrisoft-postgres-test
+    restart: unless-stopped
+    ports:
+      - '5433:5432'
+    environment:
+      POSTGRES_USER: distrisoft
+      POSTGRES_PASSWORD: distrisoft
+      POSTGRES_DB: distrisoft_test
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U distrisoft -d distrisoft_test']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres_test_data:

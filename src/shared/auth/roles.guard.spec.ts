@@ -1,6 +1,7 @@
 import { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
+import { AppException } from '../errors/app.exception';
 import { RolesGuard } from './roles.guard';
 
 function buildContext(user?: { role: string }): ExecutionContext {
@@ -29,7 +30,7 @@ describe('RolesGuard', () => {
     } as unknown as Reflector;
     const guard = new RolesGuard(reflector);
 
-    expect(guard.canActivate(buildContext())).toBe(false);
+    expect(() => guard.canActivate(buildContext())).toThrow(AppException);
   });
 
   it('denies access when the user role is not in the required list', () => {
@@ -38,7 +39,9 @@ describe('RolesGuard', () => {
     } as unknown as Reflector;
     const guard = new RolesGuard(reflector);
 
-    expect(guard.canActivate(buildContext({ role: 'COMMERCE' }))).toBe(false);
+    expect(() => guard.canActivate(buildContext({ role: 'COMMERCE' }))).toThrow(
+      AppException,
+    );
   });
 
   it('allows access when the user role matches a required role', () => {

@@ -122,12 +122,20 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
   private mapStatusToErrorCode(statusCode: number): ErrorCode {
     switch (statusCode) {
+      case 400:
+        return ErrorCode.BAD_REQUEST;
+      case 401:
+        return ErrorCode.UNAUTHORIZED;
+      case 403:
+        return ErrorCode.FORBIDDEN;
       case 404:
         return ErrorCode.NOT_FOUND;
       case 409:
         return ErrorCode.CONFLICT;
-      case 400:
-        return ErrorCode.BAD_REQUEST;
+      case 422:
+        return ErrorCode.UNPROCESSABLE;
+      case 503:
+        return ErrorCode.SERVICE_UNAVAILABLE;
       default:
         return ErrorCode.INTERNAL_ERROR;
     }

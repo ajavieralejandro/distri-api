@@ -1,7 +1,6 @@
 // Prisma schema for Distrisoft API.
-// Commercial domain models (clients, products, stock, orders, etc.)
-// will be added in later stages. This file only establishes the
-// PostgreSQL connection and Prisma client generation.
+// First commercial slice: users, commerces, catalog and orders.
+// Money is stored as integer centavos (ARS). There is no ledger yet.
 
 generator client {
   provider = "prisma-client-js"
@@ -12,25 +11,240 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Product decision (2026-09-07): Distrisoft exposes exactly two profiles,
-// ADMIN (distributor side) and COMMERCE (client side). See
-// docs/architecture/decisions/003-two-profile-roles.md.
+// Product decision (2026-09-07): exactly two profiles.
+// See docs/architecture/decisions/003-two-profile-roles.md.
 enum Role {
   ADMIN
   COMMERCE
 }
 
-/// Minimal user record for the two-profile model. Real auth (password
-/// hashing, sessions/JWT) is not implemented yet — see
-/// distri-front/contracts/decisions/authentication.md (OQ-01/OQ-02).
-/// commerceId is a plain scalar, not a relation: the Commerce entity itself
-/// is not modeled yet (see ROADMAP.md, etapa "D1 — Core comercial real").
+enum ProductUnit {
+  UNIT
+  PACK
+  BOX
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  DELIVERED
+  CANCELLED
+}
+
+enum DeliveryMode {
+  PICKUP
+  DELIVERY
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CARD
+}
+
+model Commerce {
+  id           String           @id @default(cuid())
+  businessName String
+  tradeName    String
+  taxId        String           @unique
+  email        String
+  phone        String
+  address      String
+  city         String
+  active       Boolean          @default(true)
+  tags         String[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  latitude     Float?
+  longitude    Float?
+  users        User[]
+  branches     CommerceBranch[]
+  orders       Order[]
+}
+
+model CommerceBranch {
+  id         String   @id @default(cuid())
+  commerceId String
+  name       String
+  address    String
+  phone      String
+  commerce   Commerce @relation(fields: [commerceId], references: [id], onDelete: Cascade)
+
+  @@index([commerceId])
+}
+
 model User {
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  displayName         String
+  passwordHash        String
+  role                Role
+  commerceId          String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  recordedPayments    Payment[]
+  deliveryCompletions DeliveryCompletion[]
+
+  commerce Commerce? @relation(fields: [commerceId], references: [id])
+  sessions Session[]
+
+  @@index([commerceId])
+}
+
+model Session {
+  id               String    @id @default(cuid())
+  userId           String
+  refreshTokenHash String    @unique
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Product {
+  id             String      @id @default(cuid())
+  sku            String      @unique
+  name           String
+  description    String
+  categoryId     String
+  brand          String
+  unit           ProductUnit
+  presentation   String
+  priceCents     Int
+  availableStock Int
+  active         Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  category Category @relation(fields: [categoryId], references: [id])
+
+  @@index([categoryId])
+  @@index([active])
+}
+
+model Order {
+  id                 String              @id @default(cuid())
+  number             Int                 @unique @default(autoincrement())
+  commerceId         String
+  createdById        String
+  status             OrderStatus         @default(PENDING)
+  notes              String?
+  paymentMethod      PaymentMethod?
+  deliveryMode       DeliveryMode
+  deliveryCompletion DeliveryCompletion?
+  recipient          String?
+  phone              String?
+  address            String?
+  city               String?
+  deliveryNotes      String?
+  subtotalCents      Int
+  totalCents         Int
+  stockDeducted      Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  payments           Payment[]
+
+  commerce       Commerce           @relation(fields: [commerceId], references: [id])
+  items          OrderItem[]
+  events         OrderEvent[]
+  idempotency    IdempotencyRecord?
+  paymentVersion Int                @default(0)
+
+  @@index([commerceId, createdAt])
+  @@index([status, createdAt])
+}
+
+model OrderItem {
+  id             String      @id @default(cuid())
+  orderId        String
+  productId      String
+  sku            String
+  name           String
+  unit           ProductUnit
+  unitPriceCents Int
+  quantity       Int
+  lineTotalCents Int
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model OrderEvent {
+  id         String       @id @default(cuid())
+  orderId    String
+  fromStatus OrderStatus?
+  toStatus   OrderStatus
+  userId     String
+  note       String?
+  createdAt  DateTime     @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+/// One successful create per user and key. Retained for the life of the row
+/// so a retry cannot create a second order after a short retention window.
+model IdempotencyRecord {
   id          String   @id @default(cuid())
-  email       String   @unique
-  displayName String
-  role        Role
-  commerceId  String?
+  userId      String
+  key         String
+  requestHash String
+  orderId     String   @unique
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+}
+
+/// Pago recibido e imputado a un pedido concreto.
+/// El importe se guarda en centavos de ARS.
+model Payment {
+  id                 String              @id @default(cuid())
+  orderId            String
+  recordedById       String
+  amountCents        Int
+  method             PaymentMethod
+  createdAt          DateTime            @default(now())
+  idempotencyKey     String
+  requestHash        String
+  deliveryCompletion DeliveryCompletion?
+  order              Order               @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  recordedBy         User                @relation(fields: [recordedById], references: [id], onDelete: Restrict)
+
+  @@unique([recordedById, idempotencyKey])
+  @@index([orderId, createdAt])
+  @@index([recordedById])
+}
+
+/// Resultado de finalizar una entrega.
+/// Conserva la clave para recuperar reintentos sin repetir efectos.
+model DeliveryCompletion {
+  id             String   @id @default(cuid())
+  orderId        String   @unique
+  completedById  String
+  idempotencyKey String
+  requestHash    String
+  paymentId      String?  @unique
+  createdAt      DateTime @default(now())
+
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  completedBy User     @relation(fields: [completedById], references: [id], onDelete: Restrict)
+  payment     Payment? @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@unique([completedById, idempotencyKey])
 }

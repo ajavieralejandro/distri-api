@@ -4,6 +4,9 @@
   "description": "Distrisoft distributor API - modular NestJS monolith",
   "author": "",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
@@ -22,6 +25,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
+    "prisma:seed": "prisma db seed",
+    "test-data:init": "ts-node --project prisma/tsconfig.json prisma/init-test-data.ts",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f postgres"
@@ -80,5 +85,8 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "prisma": {
+    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   }
 }

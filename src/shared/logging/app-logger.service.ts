@@ -1,12 +1,18 @@
-import { Injectable, Logger, LoggerService, Scope } from '@nestjs/common';
+import {
+  ConsoleLogger,
+  Injectable,
+  LoggerService,
+  Scope,
+} from '@nestjs/common';
 
 /**
- * Thin wrapper around NestJS Logger so modules share a consistent
- * logging entry point without introducing a third-party library yet.
+ * Thin wrapper around Nest's console logger.
+ * It must not use `Logger`: once `app.useLogger()` installs this class,
+ * every `Logger` instance delegates back here and the process recurses.
  */
 @Injectable({ scope: Scope.TRANSIENT })
 export class AppLogger implements LoggerService {
-  private readonly logger = new Logger();
+  private readonly logger = new ConsoleLogger();
   private context?: string;
 
   setContext(context: string): void {

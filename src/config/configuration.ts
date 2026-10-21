@@ -5,6 +5,9 @@ export interface AppConfig {
   port: number;
   databaseUrl: string;
   corsOrigin: string | string[];
+  jwtSecret: string;
+  jwtAccessTtlSeconds: number;
+  jwtRefreshTtlSeconds: number;
 }
 
 const VALID_NODE_ENVS: readonly EnvironmentName[] = [
@@ -48,6 +51,32 @@ function parseNodeEnv(raw: string): EnvironmentName {
   return raw as EnvironmentName;
 }
 
+function parsePositiveInt(
+  raw: string | undefined,
+  fallback: number,
+  key: string,
+): number {
+  if (raw === undefined || raw.trim() === '') {
+    return fallback;
+  }
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(
+      `Invalid ${key} value "${raw}". Expected a positive integer.`,
+    );
+  }
+  return value;
+}
+
+function parseJwtSecret(raw: string): string {
+  if (raw.length < 32) {
+    throw new Error(
+      'Invalid JWT_SECRET. Expected a random string of at least 32 characters.',
+    );
+  }
+  return raw;
+}
+
 function parseCorsOrigin(raw: string | undefined): string | string[] {
   if (!raw || raw.trim() === '' || raw.trim() === '*') {
     return '*';
@@ -75,6 +104,21 @@ export function validateEnv(
   const nodeEnv = parseNodeEnv(requireString(config, 'NODE_ENV'));
   const port = parsePort(requireString(config, 'PORT'));
   const databaseUrl = requireString(config, 'DATABASE_URL');
+  const jwtSecret = parseJwtSecret(requireString(config, 'JWT_SECRET'));
+  const accessTtl = parsePositiveInt(
+    typeof config.JWT_ACCESS_TTL_SECONDS === 'string'
+      ? config.JWT_ACCESS_TTL_SECONDS
+      : undefined,
+    900,
+    'JWT_ACCESS_TTL_SECONDS',
+  );
+  const refreshTtl = parsePositiveInt(
+    typeof config.JWT_REFRESH_TTL_SECONDS === 'string'
+      ? config.JWT_REFRESH_TTL_SECONDS
+      : undefined,
+    604800,
+    'JWT_REFRESH_TTL_SECONDS',
+  );
   const corsOrigin = parseCorsOrigin(
     typeof config.CORS_ORIGIN === 'string' ? config.CORS_ORIGIN : undefined,
   );
@@ -84,6 +128,9 @@ export function validateEnv(
     NODE_ENV: nodeEnv,
     PORT: port,
     DATABASE_URL: databaseUrl,
+    JWT_SECRET: jwtSecret,
+    JWT_ACCESS_TTL_SECONDS: accessTtl,
+    JWT_REFRESH_TTL_SECONDS: refreshTtl,
     CORS_ORIGIN: corsOrigin,
   };
 }
@@ -93,4 +140,7 @@ export default (): AppConfig => ({
   port: Number(process.env.PORT),
   databaseUrl: process.env.DATABASE_URL as string,
   corsOrigin: parseCorsOrigin(process.env.CORS_ORIGIN),
+  jwtSecret: process.env.JWT_SECRET as string,
+  jwtAccessTtlSeconds: Number(process.env.JWT_ACCESS_TTL_SECONDS ?? 900),
+  jwtRefreshTtlSeconds: Number(process.env.JWT_REFRESH_TTL_SECONDS ?? 604800),
 });
