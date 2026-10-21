@@ -48,3 +48,30 @@ export function sumCents(values: number[]): number {
     return total + value;
   }, 0);
 }
+
+/**
+ * Convierte un importe decimal positivo a centavos.
+ * Acepta "20", "20.5" o "20.50".
+ * Rechaza comas, signos, espacios y más de dos decimales.
+ */
+export function parsePaymentCents(amount: string): number {
+  if (
+    typeof amount !== 'string' ||
+    !/^(0|[1-9]\d{0,7})(\.\d{1,2})?$/.test(amount)
+  ) {
+    throw new Error('Invalid payment amount.');
+  }
+
+  const [whole, fraction = ''] = amount.split('.');
+
+  const cents =
+    Number(whole) * 100 +
+    Number(fraction.padEnd(2, '0'));
+
+  // Payment.amountCents se guarda como PostgreSQL Int.
+  if (cents <= 0 || cents > 2_147_483_647) {
+    throw new Error('Payment amount is outside the supported range.');
+  }
+
+  return cents;
+}

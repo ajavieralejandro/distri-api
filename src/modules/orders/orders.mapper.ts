@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { money } from '../../shared/money/money';
 import type { StoredOrder } from './orders.repository';
 
-const orderInclude = {
+export const orderInclude = {
   items: { orderBy: { id: 'asc' as const } },
   events: { orderBy: { createdAt: 'asc' as const } },
   commerce: { select: { tradeName: true } },

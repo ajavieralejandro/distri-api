@@ -101,12 +101,13 @@ export interface OrderTx {
   deductStock(
     lines: { productId: string; quantity: number }[],
   ): Promise<boolean>;
-  applyStatus(input: {
-    orderId: string;
-    to: OrderStatus;
-    userId: string;
-    stockDeducted: boolean;
-  }): Promise<StoredOrder>;
+ applyStatus(input: {
+  orderId: string;
+  from: OrderStatus;
+  to: OrderStatus;
+  userId: string;
+  stockDeducted: boolean;
+}): Promise<StoredOrder>;
 
   tryChangeStatus(
   id: string,

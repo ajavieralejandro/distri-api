@@ -193,12 +193,15 @@ export class OrdersService {
         }
         stockDeducted = true;
       }
+
       return tx.applyStatus({
         orderId: order.id,
+        from: order.status,
         to: status,
         userId: user.userId,
         stockDeducted,
       });
+      
     });
   }
 }
