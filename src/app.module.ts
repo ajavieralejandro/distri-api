@@ -13,6 +13,7 @@ import { JwtAuthGuard } from './shared/auth/jwt-auth.guard';
 import { RolesGuard } from './shared/auth/roles.guard';
 import { AppLoggerModule } from './shared/logging/app-logger.module';
 import { PrismaModule } from './shared/prisma/prisma.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 
 @Module({
   imports: [
@@ -30,6 +31,8 @@ import { PrismaModule } from './shared/prisma/prisma.module';
     CommercesModule,
     OrdersModule,
     AccountModule,
+    PaymentsModule,
+
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

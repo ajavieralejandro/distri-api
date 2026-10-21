@@ -17,14 +17,24 @@ export class PrismaPaymentsRepository implements PaymentsRepository {
   transaction<T>(
     work: (tx: PaymentTx) => Promise<T>,
   ): Promise<T> {
-    return this.prisma.$transaction((client) =>
-      work(new PrismaPaymentTx(client)),
+    return this.prisma.$transaction(
+      (client) => work(new PrismaPaymentTx(client)),
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+      },
     );
   }
 }
 
-class PrismaPaymentTx implements PaymentTx {
-  constructor(private readonly tx: Prisma.TransactionClient) {}
+/**
+ * Operaciones de pagos sobre una transacción existente.
+ * Delivery puede extender esta clase para registrar entrega
+ * y cobro dentro de la misma transacción.
+ */
+export class PrismaPaymentTx implements PaymentTx {
+  constructor(
+    protected readonly tx: Prisma.TransactionClient,
+  ) {}
 
   async findByIdempotency(
     recordedById: string,
@@ -43,7 +53,6 @@ class PrismaPaymentTx implements PaymentTx {
       return null;
     }
 
-    // El contrato actual solo admite efectivo.
     if (payment.method !== 'CASH') {
       throw new Error('Unsupported payment method.');
     }
@@ -60,7 +69,9 @@ class PrismaPaymentTx implements PaymentTx {
     };
   }
 
-  async findOrder(orderId: string): Promise<PaymentOrder | null> {
+  async findOrder(
+    orderId: string,
+  ): Promise<PaymentOrder | null> {
     return this.tx.order.findUnique({
       where: { id: orderId },
       select: {
@@ -72,64 +83,59 @@ class PrismaPaymentTx implements PaymentTx {
     });
   }
 
-  
-
-async tryAdvancePaymentVersion(
-  orderId: string,
-  expectedVersion: number,
-): Promise<boolean> {
-  const result = await this.tx.order.updateMany({
-    where: {
-      id: orderId,
-      paymentVersion: expectedVersion,
-    },
-    data: {
-      paymentVersion: {
-        increment: 1,
+  async tryAdvancePaymentVersion(
+    orderId: string,
+    expectedVersion: number,
+  ): Promise<boolean> {
+    const result = await this.tx.order.updateMany({
+      where: {
+        id: orderId,
+        paymentVersion: expectedVersion,
       },
-    },
-  });
+      data: {
+        paymentVersion: {
+          increment: 1,
+        },
+      },
+    });
 
-  return result.count === 1;
-}
+    return result.count === 1;
+  }
 
- async sumPaidCents(orderId: string): Promise<number> {
-  const result = await this.tx.payment.aggregate({
-    where: {
-      orderId,
-    },
-    _sum: {
-      amountCents: true,
-    },
-  });
+  async sumPaidCents(orderId: string): Promise<number> {
+    const result = await this.tx.payment.aggregate({
+      where: { orderId },
+      _sum: {
+        amountCents: true,
+      },
+    });
 
-  return result._sum.amountCents ?? 0;
-}
+    return result._sum.amountCents ?? 0;
+  }
 
-async insertPayment(
-  payment: NewPayment,
-): Promise<StoredPayment> {
-  const created = await this.tx.payment.create({
-    data: {
-      orderId: payment.orderId,
-      recordedById: payment.recordedById,
-      amountCents: payment.amountCents,
+  async insertPayment(
+    payment: NewPayment,
+  ): Promise<StoredPayment> {
+    const created = await this.tx.payment.create({
+      data: {
+        orderId: payment.orderId,
+        recordedById: payment.recordedById,
+        amountCents: payment.amountCents,
+        method: payment.method,
+        idempotencyKey: payment.idempotencyKey,
+        requestHash: payment.requestHash,
+      },
+    });
+
+    return {
+      id: created.id,
+      orderId: created.orderId,
+      recordedById: created.recordedById,
+      amountCents: created.amountCents,
       method: payment.method,
-      idempotencyKey: payment.idempotencyKey,
-      requestHash: payment.requestHash,
-    },
-  });
-
-  return {
-    id: created.id,
-    orderId: created.orderId,
-    recordedById: created.recordedById,
-    amountCents: created.amountCents,
-    method: payment.method,
-    createdAt: created.createdAt,
-    idempotencyKey: created.idempotencyKey,
-    requestHash: created.requestHash,
-  };
+      createdAt: created.createdAt,
+      idempotencyKey: created.idempotencyKey,
+      requestHash: created.requestHash,
+    };
+  }
 }
-}
-

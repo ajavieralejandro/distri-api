@@ -44,22 +44,23 @@ enum PaymentMethod {
 }
 
 model Commerce {
-  id           String   @id @default(cuid())
+  id           String           @id @default(cuid())
   businessName String
   tradeName    String
-  taxId        String   @unique
+  taxId        String           @unique
   email        String
   phone        String
   address      String
   city         String
-  active       Boolean  @default(true)
+  active       Boolean          @default(true)
   tags         String[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  users    User[]
-  branches CommerceBranch[]
-  orders   Order[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  latitude     Float?
+  longitude    Float?
+  users        User[]
+  branches     CommerceBranch[]
+  orders       Order[]
 }
 
 model CommerceBranch {
@@ -74,15 +75,16 @@ model CommerceBranch {
 }
 
 model User {
-  id               String    @id @default(cuid())
-  email            String    @unique
-  displayName      String
-  passwordHash     String
-  role             Role
-  commerceId       String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  recordedPayments Payment[]
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  displayName         String
+  passwordHash        String
+  role                Role
+  commerceId          String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  recordedPayments    Payment[]
+  deliveryCompletions DeliveryCompletion[]
 
   commerce Commerce? @relation(fields: [commerceId], references: [id])
   sessions Session[]
@@ -133,25 +135,26 @@ model Product {
 }
 
 model Order {
-  id            String         @id @default(cuid())
-  number        Int            @unique @default(autoincrement())
-  commerceId    String
-  createdById   String
-  status        OrderStatus    @default(PENDING)
-  notes         String?
-  paymentMethod PaymentMethod?
-  deliveryMode  DeliveryMode
-  recipient     String?
-  phone         String?
-  address       String?
-  city          String?
-  deliveryNotes String?
-  subtotalCents Int
-  totalCents    Int
-  stockDeducted Boolean        @default(false)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  payments      Payment[]
+  id                 String              @id @default(cuid())
+  number             Int                 @unique @default(autoincrement())
+  commerceId         String
+  createdById        String
+  status             OrderStatus         @default(PENDING)
+  notes              String?
+  paymentMethod      PaymentMethod?
+  deliveryMode       DeliveryMode
+  deliveryCompletion DeliveryCompletion?
+  recipient          String?
+  phone              String?
+  address            String?
+  city               String?
+  deliveryNotes      String?
+  subtotalCents      Int
+  totalCents         Int
+  stockDeducted      Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  payments           Payment[]
 
   commerce       Commerce           @relation(fields: [commerceId], references: [id])
   items          OrderItem[]
@@ -211,19 +214,37 @@ model IdempotencyRecord {
 /// Pago recibido e imputado a un pedido concreto.
 /// El importe se guarda en centavos de ARS.
 model Payment {
-  id             String        @id @default(cuid())
-  orderId        String
-  recordedById   String
-  amountCents    Int
-  method         PaymentMethod
-  createdAt      DateTime      @default(now())
-  idempotencyKey String
-  requestHash    String
-
-  order      Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  recordedBy User  @relation(fields: [recordedById], references: [id], onDelete: Restrict)
+  id                 String              @id @default(cuid())
+  orderId            String
+  recordedById       String
+  amountCents        Int
+  method             PaymentMethod
+  createdAt          DateTime            @default(now())
+  idempotencyKey     String
+  requestHash        String
+  deliveryCompletion DeliveryCompletion?
+  order              Order               @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  recordedBy         User                @relation(fields: [recordedById], references: [id], onDelete: Restrict)
 
   @@unique([recordedById, idempotencyKey])
   @@index([orderId, createdAt])
   @@index([recordedById])
+}
+
+/// Resultado de finalizar una entrega.
+/// Conserva la clave para recuperar reintentos sin repetir efectos.
+model DeliveryCompletion {
+  id             String   @id @default(cuid())
+  orderId        String   @unique
+  completedById  String
+  idempotencyKey String
+  requestHash    String
+  paymentId      String?  @unique
+  createdAt      DateTime @default(now())
+
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  completedBy User     @relation(fields: [completedById], references: [id], onDelete: Restrict)
+  payment     Payment? @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@unique([completedById, idempotencyKey])
 }
