@@ -74,14 +74,15 @@ model CommerceBranch {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  displayName  String
-  passwordHash String
-  role         Role
-  commerceId   String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id               String    @id @default(cuid())
+  email            String    @unique
+  displayName      String
+  passwordHash     String
+  role             Role
+  commerceId       String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  recordedPayments Payment[]
 
   commerce Commerce? @relation(fields: [commerceId], references: [id])
   sessions Session[]
@@ -150,11 +151,13 @@ model Order {
   stockDeducted Boolean        @default(false)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+  payments      Payment[]
 
-  commerce    Commerce           @relation(fields: [commerceId], references: [id])
-  items       OrderItem[]
-  events      OrderEvent[]
-  idempotency IdempotencyRecord?
+  commerce       Commerce           @relation(fields: [commerceId], references: [id])
+  items          OrderItem[]
+  events         OrderEvent[]
+  idempotency    IdempotencyRecord?
+  paymentVersion Int                @default(0)
 
   @@index([commerceId, createdAt])
   @@index([status, createdAt])
@@ -203,4 +206,24 @@ model IdempotencyRecord {
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@unique([userId, key])
+}
+
+/// Pago recibido e imputado a un pedido concreto.
+/// El importe se guarda en centavos de ARS.
+model Payment {
+  id             String        @id @default(cuid())
+  orderId        String
+  recordedById   String
+  amountCents    Int
+  method         PaymentMethod
+  createdAt      DateTime      @default(now())
+  idempotencyKey String
+  requestHash    String
+
+  order      Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  recordedBy User  @relation(fields: [recordedById], references: [id], onDelete: Restrict)
+
+  @@unique([recordedById, idempotencyKey])
+  @@index([orderId, createdAt])
+  @@index([recordedById])
 }
