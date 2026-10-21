@@ -23,6 +23,8 @@ export type OrderView = {
   notes: string | null;
   paymentMethod: PaymentMethod | null;
   paidAmount: Money;
+  outstandingAmount: Money;
+paymentStatus: 'UNPAID' | 'PARTIAL' | 'PAID';
   delivery: {
     mode: 'PICKUP' | 'DELIVERY';
     recipient: string | null;

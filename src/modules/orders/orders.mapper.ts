@@ -1,21 +1,28 @@
 import { Prisma } from '@prisma/client';
 
-import { money } from '../../shared/money/money';
+import { money, sumCents } from '../../shared/money/money';
+import { summarizePayments } from '../payments/payment-rules';
 import type { StoredOrder } from './orders.repository';
 
 export const orderInclude = {
   items: { orderBy: { id: 'asc' as const } },
   events: { orderBy: { createdAt: 'asc' as const } },
   commerce: { select: { tradeName: true } },
+  payments: { select: { amountCents: true } },
 } satisfies Prisma.OrderInclude;
-
 
 type OrderRow = Prisma.OrderGetPayload<{
   include: typeof orderInclude;
 }>;
 
 export function toView(order: OrderRow): StoredOrder {
-   return {
+  const paidCents = sumCents(
+    order.payments.map((payment) => payment.amountCents),
+  );
+
+  const summary = summarizePayments(order.totalCents, paidCents);
+
+  return {
     id: order.id,
     number: `PED-${order.number}`,
     commerceId: order.commerceId,
@@ -25,7 +32,9 @@ export function toView(order: OrderRow): StoredOrder {
     updatedAt: order.updatedAt.toISOString(),
     notes: order.notes,
     paymentMethod: order.paymentMethod,
-    paidAmount: money(0),
+    paidAmount: money(summary.paidCents),
+    outstandingAmount: money(summary.outstandingCents),
+    paymentStatus: summary.status,
     delivery: {
       mode: order.deliveryMode,
       recipient: order.recipient,
@@ -53,5 +62,6 @@ export function toView(order: OrderRow): StoredOrder {
       userId: event.userId,
       note: event.note,
       createdAt: event.createdAt.toISOString(),
-    }))}
+    })),
+  };
 }

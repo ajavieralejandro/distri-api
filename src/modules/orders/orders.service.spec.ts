@@ -208,6 +208,8 @@ class MemoryOrders implements OrdersRepository {
       notes: order.notes,
       paymentMethod: order.paymentMethod,
       paidAmount: money(0),
+      outstandingAmount: money(order.totalCents),
+paymentStatus: order.totalCents === 0 ? 'PAID' : 'UNPAID',
       delivery: structuredClone(order.delivery),
       items: order.lines.map((line) => ({
         productId: line.productId,
