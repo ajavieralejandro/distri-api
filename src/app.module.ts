@@ -14,7 +14,7 @@ import { RolesGuard } from './shared/auth/roles.guard';
 import { AppLoggerModule } from './shared/logging/app-logger.module';
 import { PrismaModule } from './shared/prisma/prisma.module';
 import { PaymentsModule } from './modules/payments/payments.module';
-
+import { DeliveryModule } from './modules/delivery/delivery.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -32,6 +32,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
     OrdersModule,
     AccountModule,
     PaymentsModule,
+    DeliveryModule
 
   ],
   providers: [
