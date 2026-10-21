@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
-import { money } from '../../shared/money/money';
 import { PrismaService } from '../../shared/prisma/prisma.service';
+import { orderInclude, toView } from './orders.mapper';
 import type {
   NewOrder,
   OrderListFilter,
@@ -10,14 +10,6 @@ import type {
   OrdersRepository,
   StoredOrder,
 } from './orders.repository';
-
-const orderInclude = {
-  items: { orderBy: { id: 'asc' as const } },
-  events: { orderBy: { createdAt: 'asc' as const } },
-  commerce: { select: { tradeName: true } },
-} satisfies Prisma.OrderInclude;
-
-type OrderRow = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
 
 type RawProduct = {
   id: string;
@@ -46,6 +38,7 @@ export class PrismaOrdersRepository implements OrdersRepository {
       commerceId: filter.commerceId,
       status: filter.status,
     };
+
     const [totalItems, rows] = await this.prisma.$transaction([
       this.prisma.order.count({ where }),
       this.prisma.order.findMany({
@@ -56,6 +49,7 @@ export class PrismaOrdersRepository implements OrdersRepository {
         take: filter.size,
       }),
     ]);
+
     return { totalItems, items: rows.map(toView) };
   }
 
@@ -64,6 +58,7 @@ export class PrismaOrdersRepository implements OrdersRepository {
       where: { id },
       include: orderInclude,
     });
+
     return row ? toView(row) : null;
   }
 }
@@ -75,23 +70,27 @@ class PrismaOrderTx implements OrderTx {
     const row = await this.tx.idempotencyRecord.findUnique({
       where: { userId_key: { userId, key } },
     });
-    return row ? { requestHash: row.requestHash, orderId: row.orderId } : null;
+
+    return row
+      ? { requestHash: row.requestHash, orderId: row.orderId }
+      : null;
   }
 
   async findCommerce(id: string) {
-    const commerce = await this.tx.commerce.findUnique({
+    return this.tx.commerce.findUnique({
       where: { id },
       select: { id: true, tradeName: true, active: true },
     });
-    return commerce;
   }
 
   async lockProducts(ids: string[]): Promise<RawProduct[]> {
     if (ids.length === 0) {
       return [];
     }
+
     return this.tx.$queryRaw<RawProduct[]>`
-      SELECT id, sku, name, unit::text AS unit, "priceCents", "availableStock", active
+      SELECT id, sku, name, unit::text AS unit,
+             "priceCents", "availableStock", active
       FROM "Product"
       WHERE id IN (${Prisma.join(ids)})
       FOR UPDATE
@@ -144,6 +143,7 @@ class PrismaOrderTx implements OrderTx {
       },
       include: orderInclude,
     });
+
     return toView(created);
   }
 
@@ -152,7 +152,26 @@ class PrismaOrderTx implements OrderTx {
       where: { id },
       include: orderInclude,
     });
+
     return row ? toView(row) : null;
+  }
+
+  async tryChangeStatus(
+    id: string,
+    expectedStatus: StoredOrder['status'],
+    nextStatus: StoredOrder['status'],
+  ): Promise<boolean> {
+    const result = await this.tx.order.updateMany({
+      where: {
+        id,
+        status: expectedStatus,
+      },
+      data: {
+        status: nextStatus,
+      },
+    });
+
+    return result.count === 1;
   }
 
   async deductStock(
@@ -164,54 +183,35 @@ class PrismaOrderTx implements OrderTx {
           id: line.productId,
           availableStock: { gte: line.quantity },
         },
-        data: { availableStock: { decrement: line.quantity } },
+        data: {
+          availableStock: { decrement: line.quantity },
+        },
       });
+
       if (updated.count !== 1) {
         return false;
       }
     }
+
     return true;
   }
 
-  async tryChangeStatus(
-  id: string,
-  expectedStatus: StoredOrder['status'],
-  nextStatus: StoredOrder['status'],
-): Promise<boolean> {
-  const result = await this.tx.order.updateMany({
-    where: {
-      id,
-      status: expectedStatus,
-    },
-    data: {
-      status: nextStatus,
-    },
-  });
-
-  return result.count === 1;
-}
-
   async applyStatus(input: {
     orderId: string;
+    from: StoredOrder['status'];
     to: StoredOrder['status'];
     userId: string;
     stockDeducted: boolean;
   }): Promise<StoredOrder> {
-    const current = await this.tx.order.findUnique({
-      where: { id: input.orderId },
-      select: { status: true },
-    });
-    if (!current) {
-      throw new Error('Order disappeared during status update.');
-    }
+    // tryChangeStatus ya cambió el estado dentro de esta transacción.
+    // Aquí completamos la marca de stock y el historial.
     const updated = await this.tx.order.update({
       where: { id: input.orderId },
       data: {
-        status: input.to,
         stockDeducted: input.stockDeducted,
         events: {
           create: {
-            fromStatus: current.status,
+            fromStatus: input.from,
             toStatus: input.to,
             userId: input.userId,
           },
@@ -219,52 +219,7 @@ class PrismaOrderTx implements OrderTx {
       },
       include: orderInclude,
     });
+
     return toView(updated);
   }
-}
-
-
-function toView(order: OrderRow): StoredOrder {
-  return {
-    id: order.id,
-    number: `PED-${order.number}`,
-    commerceId: order.commerceId,
-    commerceName: order.commerce.tradeName,
-    status: order.status,
-    createdAt: order.createdAt.toISOString(),
-    updatedAt: order.updatedAt.toISOString(),
-    notes: order.notes,
-    paymentMethod: order.paymentMethod,
-    paidAmount: money(0),
-    delivery: {
-      mode: order.deliveryMode,
-      recipient: order.recipient,
-      phone: order.phone,
-      address: order.address,
-      city: order.city,
-      references: order.deliveryNotes,
-    },
-    items: order.items.map((item) => ({
-      productId: item.productId,
-      sku: item.sku,
-      name: item.name,
-      unit: item.unit,
-      unitPrice: money(item.unitPriceCents),
-      quantity: item.quantity,
-      lineTotal: money(item.lineTotalCents),
-    })),
-    subtotal: money(order.subtotalCents),
-    total: money(order.totalCents),
-    stockDeducted: order.stockDeducted,
-    history: order.events.map((event) => ({
-      id: event.id,
-      fromStatus: event.fromStatus,
-      toStatus: event.toStatus,
-      userId: event.userId,
-      note: event.note,
-      createdAt: event.createdAt.toISOString(),
-    })),
-  };
-
-  
 }

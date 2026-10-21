@@ -163,6 +163,19 @@ export class OrdersService {
         );
       }
       assertTransition(order.status, status);
+      const changed = await tx.tryChangeStatus(
+        order.id,
+        order.status,
+        status,
+      );
+
+      if (!changed) {
+        throw new AppException(
+          'El pedido cambió mientras lo estabas procesando. Actualizá e intentá nuevamente.',
+          HttpStatus.CONFLICT,
+          ErrorCode.CONFLICT,
+        );
+      }
       let stockDeducted = order.stockDeducted;
       if (status === 'CONFIRMED' && !stockDeducted) {
         const deducted = await tx.deductStock(
