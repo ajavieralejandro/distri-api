@@ -15,6 +15,7 @@ import { AppLoggerModule } from './shared/logging/app-logger.module';
 import { PrismaModule } from './shared/prisma/prisma.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
+import { CategoriesModule } from './modules/categories/categories.modules';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -32,7 +33,8 @@ import { DeliveryModule } from './modules/delivery/delivery.module';
     OrdersModule,
     AccountModule,
     PaymentsModule,
-    DeliveryModule
+    DeliveryModule,
+    CategoriesModule
 
   ],
   providers: [
