@@ -41,6 +41,45 @@ export class CatalogService {
     });
   }
 
+    /**
+   * Crea una categoría y devuelve su ID y nombre.
+   *
+   * El nombre llega validado desde CreateCategoryDto.
+   * Prisma genera automáticamente el ID mediante @default(cuid()).
+   * Los productos usarán ese ID en su campo categoryId.
+   */
+  async createCategory(name: string): Promise<CategoryView> {
+    try {
+      return await this.prisma.category.create({
+        // Solo proporcionamos el nombre.
+        // El ID y las fechas se completan según el esquema de Prisma.
+        data: { name },
+
+        // Define qué campos devuelve la operación.
+        select: { id: true, name: true },
+      });
+    } catch (error) {
+      // Category.name tiene una restricción @unique.
+      // Prisma devuelve P2002 si intentamos repetir un valor único.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        // Convertimos el error de base de datos en una respuesta
+        // HTTP 409 (Conflict) que el frontend pueda mostrar.
+        throw new AppException(
+          'Ya existe una categoría con ese nombre.',
+          HttpStatus.CONFLICT,
+          ErrorCode.CONFLICT,
+        );
+      }
+
+      // Conservamos otros errores para que los gestione
+      // el manejador general de errores de la aplicación.
+      throw error;
+    }
+  }
+
   async listProducts(query: {
     page: number;
     size: number;
@@ -122,4 +161,6 @@ function toProduct(product: {
     availableStock: product.availableStock,
     active: product.active,
   };
+
+  
 }
